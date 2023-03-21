@@ -1,6 +1,7 @@
 package com.example.weatherapp
 
 import android.annotation.SuppressLint
+import android.app.Dialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -34,6 +35,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mFusedLocationProviderClient: FusedLocationProviderClient
+    private var mProgressDialog:Dialog?=null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -97,12 +99,17 @@ class MainActivity : AppCompatActivity() {
             val listCall: Call<WeatherResponse> = service.getWeather(latitude!!,
                 longitude!!,Constants.METRIC_UNIT,Constants.APP_ID)
 
+
+            showCustomProgressDialog()
+
+
             listCall.enqueue(object: Callback<WeatherResponse>{
                 override fun onResponse(
                     call: Call<WeatherResponse>,
                     response: Response<WeatherResponse>
                 ) {
                     if(response.isSuccessful){
+                        hideCustomProgressDialog()
                         val weatherList: WeatherResponse? = response.body()
                         Log.i("Weather Response","$weatherList")
                     }
@@ -125,6 +132,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
+                    hideCustomProgressDialog()
                     Log.e("ERRORrrrrr",t.message.toString())
                 }
 
@@ -187,5 +195,17 @@ class MainActivity : AppCompatActivity() {
             LocationManager.NETWORK_PROVIDER
         )
 
+    }
+
+    private fun showCustomProgressDialog(){
+        mProgressDialog=Dialog(this@MainActivity)
+        mProgressDialog!!.setContentView(R.layout.dialog_custom_progress)
+        mProgressDialog!!.show()
+    }
+
+    private fun hideCustomProgressDialog(){
+        if(mProgressDialog!=null){
+            mProgressDialog!!.dismiss()
+        }
     }
 }
