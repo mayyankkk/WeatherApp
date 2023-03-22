@@ -5,6 +5,8 @@ import android.app.Dialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.location.LocationRequest
@@ -15,9 +17,14 @@ import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
+import com.example.weatherapp.databinding.ActivityMainBinding
+import com.example.weatherapp.models.Coord
+import com.example.weatherapp.models.Sys
 import com.example.weatherapp.models.Weather
 import com.example.weatherapp.models.WeatherResponse
 import com.example.weatherapp.network.WeatherService
@@ -30,15 +37,23 @@ import com.karumi.dexter.MultiplePermissionsReport
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
+import com.squareup.picasso.Picasso
 import retrofit2.*
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.IOError
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mFusedLocationProviderClient: FusedLocationProviderClient
-    private var mProgressDialog:Dialog?=null
+    private var mProgressDialog: Dialog? = null
+    lateinit var binding: ActivityMainBinding
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
 
@@ -88,42 +103,46 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getLocationWeatherDetails(latitude:Double?,longitude:Double?) {
+    private fun getLocationWeatherDetails(latitude: Double?, longitude: Double?) {
         if (Constants.isNetworkAvailable(this)) {
             val retroFit: Retrofit = Retrofit.Builder().baseUrl(Constants.BASE_URL)
                 .addConverterFactory(GsonConverterFactory.create()).build()
 
-            val service: WeatherService= retroFit
+            val service: WeatherService = retroFit
                 .create<WeatherService>(WeatherService::class.java)
 
-            val listCall: Call<WeatherResponse> = service.getWeather(latitude!!,
-                longitude!!,Constants.METRIC_UNIT,Constants.APP_ID)
+            val listCall: Call<WeatherResponse> = service.getWeather(
+                latitude!!,
+                longitude!!, Constants.METRIC_UNIT, Constants.APP_ID
+            )
 
 
             showCustomProgressDialog()
 
 
-            listCall.enqueue(object: Callback<WeatherResponse>{
+            listCall.enqueue(object : Callback<WeatherResponse> {
                 override fun onResponse(
                     call: Call<WeatherResponse>,
                     response: Response<WeatherResponse>
                 ) {
-                    if(response.isSuccessful){
+                    if (response.isSuccessful) {
                         hideCustomProgressDialog()
                         val weatherList: WeatherResponse? = response.body()
-                        Log.i("Weather Response","$weatherList")
-                    }
-                    else{
-                        val rc= response.code()
-                        when(rc){
-                            400->{
-                                Log.e("ERROR 400","Bad Connection")
+
+                        setupUI(weatherList!!)
+
+                        Log.i("Weather Response", "$weatherList")
+                    } else {
+                        val rc = response.code()
+                        when (rc) {
+                            400 -> {
+                                Log.e("ERROR 400", "Bad Connection")
                             }
-                            404->{
-                                Log.e("ERROR 404","Error 404 Not Found")
+                            404 -> {
+                                Log.e("ERROR 404", "Error 404 Not Found")
                             }
-                            else->{
-                                Log.e("Generic error","Error")
+                            else -> {
+                                Log.e("Generic error", "Error")
 
                             }
 
@@ -133,11 +152,10 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
                     hideCustomProgressDialog()
-                    Log.e("ERRORrrrrr",t.message.toString())
+                    Log.e("ERRORrrrrr", t.message.toString())
                 }
 
             })
-
 
 
         } else {
@@ -182,7 +200,7 @@ class MainActivity : AppCompatActivity() {
             Log.i("Current Latitude", latitude.toString())
             val longitude = mLastLocation?.longitude
             Log.i("Current longitude", longitude.toString())
-            getLocationWeatherDetails(latitude,longitude)
+            getLocationWeatherDetails(latitude, longitude)
         }
     }
 
@@ -197,15 +215,78 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun showCustomProgressDialog(){
-        mProgressDialog=Dialog(this@MainActivity)
+    private fun showCustomProgressDialog() {
+        mProgressDialog = Dialog(this@MainActivity)
         mProgressDialog!!.setContentView(R.layout.dialog_custom_progress)
         mProgressDialog!!.show()
     }
 
-    private fun hideCustomProgressDialog(){
-        if(mProgressDialog!=null){
+    private fun hideCustomProgressDialog() {
+        if (mProgressDialog != null) {
             mProgressDialog!!.dismiss()
         }
     }
+
+
+    @SuppressLint("SetTextI18n")
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun setupUI(weatherList: WeatherResponse) {
+        for (i in weatherList.weather.indices) {
+            Log.i("Weather Name", weatherList.weather.toString())
+            binding.tvMain.text = weatherList.weather[i].main
+            binding.tvMainDescription.text = weatherList.weather[i].description
+            binding.tvTemp.text = buildString {
+                append(weatherList.main.temp.toString())
+                append(getUnit(application.resources.configuration.locales.toString()))
+            }
+            binding.tvHumidity.text=weatherList.main.humidity.toString() + getString(R.string.per_cent)
+            binding.tvSpeed.text= weatherList.wind.speed.toString()
+
+            binding.tvMin.text=weatherList.main.temp_min.toString() +" min"
+            binding.tvMax.text=weatherList.main.temp_max.toString() +" max"
+
+            binding.tvName.text=weatherList.name
+            binding.tvCountry.text= weatherList.sys.country
+
+            binding.tvSunriseTime.text= getTime(weatherList.sys.sunrise)
+            binding.tvSunsetTime.text=getTime(weatherList.sys.sunset)
+
+            Picasso.get().load("https://openweathermap.org/img/wn/${weatherList.weather[i].icon}@2x.png").into(binding.ivMain)
+        }
+    }
+
+    private fun getUnit(v: String): String {
+        var value = "°C"
+        if ("US" == v || "LR" == v || "MM" == v) {
+            value = "°F"
+        }
+        return value
+    }
+
+    private fun getTime(timex:Long):String{
+        val date= Date(timex*1000L)
+        val sdf=SimpleDateFormat("HH:mm",Locale.UK)
+        sdf.timeZone= TimeZone.getDefault()
+        return sdf.format(date)
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_main,menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when(item.itemId){
+            R.id.action_refresh-> {
+                requestLocationData()
+                true
+            }
+            else->super.onOptionsItemSelected(item)
+        }
+
+
+
+    }
+
 }
