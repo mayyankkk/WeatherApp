@@ -6,4 +6,6 @@
     <string name="miles_per_hour">miles/hour</string>
     <string name="per_cent">\" per cent\"</string>
     <string name="refresh">Refresh</string>
+    <string name="search">Search</string>
+    <string name="search_hint">e.g: Delhi, Patna</string>
 </resources>

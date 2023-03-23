@@ -8,6 +8,18 @@
     android:orientation="vertical"
     android:padding="@dimen/main_screen_content_padding"
     tools:context=".MainActivity">
+    <SearchView
+        android:id="@+id/searchView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="2dp"
+        android:iconifiedByDefault="false"
+        android:queryHint="Enter a city name"
+        android:layout_marginStart="@dimen/card_view_marginStartEnd"
+        android:layout_marginBottom="@dimen/divider_margin"
+        android:background="@drawable/search_background"
+        android:queryBackground="@color/transparent"
+        android:layout_marginEnd="@dimen/card_view_marginStartEnd"/>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -22,6 +34,7 @@
             android:layout_weight="1"
             android:background="@color/white"
             android:elevation="@dimen/card_view_elevation"
+
             app:cardCornerRadius="@dimen/card_view_corner_radius">
 
             <LinearLayout

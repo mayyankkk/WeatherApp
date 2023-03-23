@@ -2,6 +2,7 @@ package com.example.weatherapp
 
 import android.annotation.SuppressLint
 import android.app.Dialog
+import android.app.SearchManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
+import android.widget.SearchView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
@@ -27,6 +29,7 @@ import com.example.weatherapp.models.Coord
 import com.example.weatherapp.models.Sys
 import com.example.weatherapp.models.Weather
 import com.example.weatherapp.models.WeatherResponse
+import com.example.weatherapp.network.WeatherCityService
 import com.example.weatherapp.network.WeatherService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -100,6 +103,81 @@ class MainActivity : AppCompatActivity() {
                     }
                 }).onSameThread()
                 .check()
+
+            binding.searchView.setOnQueryTextListener(object: SearchView.OnQueryTextListener{
+                override fun onQueryTextSubmit(p0: String?): Boolean {
+                    binding.searchView.clearFocus()
+                    getLatitudeAndLongitude(p0!!)
+                    return true
+                }
+
+                override fun onQueryTextChange(p0: String?): Boolean {
+                    return false
+                }
+
+
+            })
+        }
+    }
+
+    private fun getLatitudeAndLongitude(city: String){
+        if(Constants.isNetworkAvailable(this)){
+            val retrofit:Retrofit= Retrofit.Builder().baseUrl(Constants.BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create()).build()
+
+            val service: WeatherCityService = retrofit
+                .create<WeatherCityService>(WeatherCityService::class.java)
+
+            val listCall: Call<WeatherResponse> =  service.getWeather(city,
+                Constants.METRIC_UNIT,Constants.APP_ID)
+
+            showCustomProgressDialog()
+
+            listCall.enqueue(object : Callback<WeatherResponse> {
+                @RequiresApi(Build.VERSION_CODES.N)
+                override fun onResponse(
+                    call: Call<WeatherResponse>,
+                    response: Response<WeatherResponse>
+                ) {
+                    if (response.isSuccessful) {
+                        hideCustomProgressDialog()
+                        val weatherList: WeatherResponse? = response.body()
+
+                        setupUI(weatherList!!)
+
+                        Log.i("Weather Response", "$weatherList")
+                    } else {
+                        val rc = response.code()
+                        when (rc) {
+                            400 -> {
+                                hideCustomProgressDialog()
+                                Log.e("ERROR 400", "Bad Connection")
+                            }
+                            404 -> {
+                                Log.e("ERROR 404", "Error 404 Not Found")
+                                hideCustomProgressDialog()
+                                Toast.makeText(this@MainActivity,"Given city not found",Toast.LENGTH_SHORT).show()
+
+                            }
+                            else -> {
+                                hideCustomProgressDialog()
+                                Log.e("Generic error", "Error")
+
+                            }
+
+                        }
+                    }
+                }
+
+                override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
+                    hideCustomProgressDialog()
+                    Log.e("ERRORrrrrr", t.message.toString())
+                }
+
+            })
+
+
+
         }
     }
 
@@ -121,6 +199,7 @@ class MainActivity : AppCompatActivity() {
 
 
             listCall.enqueue(object : Callback<WeatherResponse> {
+                @RequiresApi(Build.VERSION_CODES.N)
                 override fun onResponse(
                     call: Call<WeatherResponse>,
                     response: Response<WeatherResponse>
@@ -185,6 +264,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     @RequiresApi(Build.VERSION_CODES.S)
     private fun requestLocationData() {
+
         val mLocationRequest = com.google.android.gms.location.LocationRequest()
         mLocationRequest.priority = LocationRequest.QUALITY_HIGH_ACCURACY
         mFusedLocationProviderClient.requestLocationUpdates(
@@ -200,6 +280,7 @@ class MainActivity : AppCompatActivity() {
             Log.i("Current Latitude", latitude.toString())
             val longitude = mLastLocation?.longitude
             Log.i("Current longitude", longitude.toString())
+
             getLocationWeatherDetails(latitude, longitude)
         }
     }
@@ -239,7 +320,7 @@ class MainActivity : AppCompatActivity() {
                 append(weatherList.main.temp.toString())
                 append(getUnit(application.resources.configuration.locales.toString()))
             }
-            binding.tvHumidity.text=weatherList.main.humidity.toString() + getString(R.string.per_cent)
+            binding.tvHumidity.text=weatherList.main.humidity.toString() + " per cent"
             binding.tvSpeed.text= weatherList.wind.speed.toString()
 
             binding.tvMin.text=weatherList.main.temp_min.toString() +" min"
@@ -272,17 +353,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_main,menu)
+
+
         return super.onCreateOptionsMenu(menu)
     }
 
+    @SuppressLint("MissingPermission")
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when(item.itemId){
             R.id.action_refresh-> {
+                Log.i("Mayank","OK")
                 requestLocationData()
                 true
             }
-            else->super.onOptionsItemSelected(item)
+            else->
+                super.onOptionsItemSelected(item)
         }
 
 

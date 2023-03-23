@@ -7,4 +7,5 @@
         android:title="@string/refresh"
         android:orderInCategory="100"
         app:showAsAction="always"/>
+
 </menu>
